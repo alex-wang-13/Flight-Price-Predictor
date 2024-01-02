@@ -1,0 +1,5 @@
+# ignore python venv
+/venv
+
+# ignore training data and program output
+*.csv
