@@ -1,7 +1,10 @@
 import pandas as pd
 import datetime as dt
 
-from sklearn.linear_model import LinearRegression
+from sklearn.ensemble import RandomForestRegressor
+from sklearn.feature_selection import RFE
+from sklearn.model_selection import RandomizedSearchCV, train_test_split
+from sklearn.metrics import r2_score
 
 """
 A program to predict the price column of a .csv file dataframe.
@@ -16,8 +19,8 @@ if not TRAIN_FP:
 """
 Get the training data.
 """
-train: pd.DataFrame = pd.read_csv(TRAIN_FP)
-train.info()
+data: pd.DataFrame = pd.read_csv(TRAIN_FP)
+data.info()
 print()
 
 """
@@ -60,7 +63,59 @@ def make_numerical(df: pd.DataFrame) -> pd.DataFrame:
 """
 Get the correlation matrix to the price column.
 """
-train = make_numerical(train)
-corr_matrix = train.corr()['price']
-print(f"correlation matrix w/ respect to price:\n{corr_matrix}")
+data = make_numerical(data)
+data.dropna(inplace=True)
+corr_matrix = data.corr()['price']
+print(f"correlation matrix w/ respect to price:\n{corr_matrix}\n")
 
+"""
+Split test and training data.
+"""
+X = data.drop(labels='price', axis=1)
+y = data['price']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.33, random_state=42)
+
+"""
+Feature selection with recursive feature elimination (RFE)
+"""
+estimator = RandomForestRegressor(n_estimators=10)
+selector = RFE(estimator, n_features_to_select=5)
+selector.fit(X_train, y_train)
+relevant_features = X_train.columns[selector.support_].tolist()
+print(f"Most relavent features: {relevant_features}\n")
+
+"""
+Find the best parameters on the best model.
+"""
+rf_model = RandomForestRegressor(random_state=42)
+param_grid: dict = {
+  "n_estimators": [5, 10, 20, 30],
+  "max_depth": [None, 10, 20, 30],
+  "min_samples_split": [2, 5, 10],
+  "min_samples_leaf": [1, 2, 4]
+}
+random_search = RandomizedSearchCV(
+  rf_model, param_distributions=param_grid, n_iter=5, scoring="r2", cv=5, random_state=42, verbose=1
+)
+
+"""
+Search for the best model with most relevant features.
+"""
+random_search.fit(X_train[relevant_features], y_train)
+best_model: RandomForestRegressor = random_search.best_estimator_
+best_params = random_search.best_params_
+
+"""
+Use the best model to predict make predictions on test set.
+"""
+y_pred = best_model.predict(X_test[relevant_features])
+error = r2_score(y_test, y_pred)
+print(f"Best model: {best_model}\nBest parameters: {best_params}\n")
+print(f"Accuracy (r^2 score): {error}")
+
+"""
+Export results.
+"""
+results: pd.DataFrame = X_test[relevant_features]
+results.loc[:, "price"] = y_pred
+results.to_csv("prediction.csv", index=False)
