@@ -11,7 +11,7 @@ Make sure you have the necessary libraries installed (see `requirements.txt`). Y
 
 1. Clone the repository:
 ``` bash
-git clone https://github.com/yourusername/flight-price-predictor.git
+git clone git@github.com:alex-wang-13/Flight-Price-Predictor.git
 cd flight-price-predictor
 ```
 
